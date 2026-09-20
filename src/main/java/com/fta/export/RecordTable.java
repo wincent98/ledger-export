@@ -34,16 +34,38 @@ public class RecordTable {
         if (limit <= 0) {
             throw new IllegalArgumentException("limit must be positive");
         }
+        int first = 0;
+        if (!cursor.isStart()) {
+            first = firstIndexAfter(cursor);
+        }
         List<Record> out = new ArrayList<>();
-        for (Record row : rows) {
-            if (!cursor.isStart() && row.updatedAtNanos() < cursor.updatedAtNanos()) {
-                continue;
-            }
-            out.add(row);
-            if (out.size() == limit) {
-                break;
-            }
+        for (int i = first; i < rows.size() && out.size() < limit; i++) {
+            out.add(rows.get(i));
         }
         return out;
+    }
+
+    /** Index of the first row that comes strictly after {@code cursor} in scan order. */
+    private int firstIndexAfter(Cursor cursor) {
+        if (cursor.legacyMillisMarker()) {
+            // Decoded v1 token: resume immediately after the row the token was issued on.
+            // The id disambiguates the position the rounded millisecond boundary lost.
+            for (int i = 0; i < rows.size(); i++) {
+                if (rows.get(i).id() == cursor.id()) {
+                    return i + 1;
+                }
+            }
+            // Marker row no longer present: fall back to the strict keyset boundary at the
+            // decoded millisecond, which never replays already delivered rows.
+        }
+        for (int i = 0; i < rows.size(); i++) {
+            Record row = rows.get(i);
+            if (row.updatedAtNanos() > cursor.updatedAtNanos()
+                    || (row.updatedAtNanos() == cursor.updatedAtNanos()
+                        && row.id() > cursor.id())) {
+                return i;
+            }
+        }
+        return rows.size();
     }
 }
