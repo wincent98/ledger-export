@@ -36,8 +36,15 @@ public class RecordTable {
         }
         List<Record> out = new ArrayList<>();
         for (Record row : rows) {
-            if (!cursor.isStart() && row.updatedAtNanos() < cursor.updatedAtNanos()) {
-                continue;
+            if (!cursor.isStart()) {
+                // Keyset comparison on the full (updatedAtNanos, id) ordering:
+                // rows at or before the cursor position belong to earlier pages.
+                if (row.updatedAtNanos() < cursor.updatedAtNanos()) {
+                    continue;
+                }
+                if (row.updatedAtNanos() == cursor.updatedAtNanos() && row.id() <= cursor.id()) {
+                    continue;
+                }
             }
             out.add(row);
             if (out.size() == limit) {

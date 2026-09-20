@@ -38,6 +38,16 @@ class CursorTest {
     }
 
     @Test
+    void roundTripsAnUnalignedPositionWithoutLosingSubMillisecondRows() {
+        // Regression: encode used to round up to the enclosing millisecond, so rows
+        // later in the same millisecond were skipped on resume.
+        long unaligned = ALIGNED + 123_456L;
+        Cursor decoded = Cursor.decode(Cursor.encode(new Cursor(unaligned, 7L)));
+        assertEquals(unaligned, decoded.updatedAtNanos());
+        assertEquals(7L, decoded.id());
+    }
+
+    @Test
     void buildsACursorFromARecord() {
         Cursor c = Cursor.of(new Record(9L, ALIGNED, "p"));
         assertEquals(ALIGNED, c.updatedAtNanos());

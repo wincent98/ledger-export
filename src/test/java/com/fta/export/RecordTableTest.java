@@ -54,6 +54,17 @@ class RecordTableTest {
     }
 
     @Test
+    void pageUsesTheIdTiebreakerWithinTheSameTimestamp() {
+        // Regression: rows sharing the cursor timestamp with a smaller or equal id
+        // were re-emitted, duplicating them across pages.
+        table.insert(new Record(5L, 2_000_000L, "tie"));
+        List<Record> page = table.page(new Cursor(2_000_000L, 2L), 10);
+        assertEquals(2, page.size());
+        assertEquals(5L, page.get(0).id());
+        assertEquals(3L, page.get(1).id());
+    }
+
+    @Test
     void pageRejectsANonPositiveLimit() {
         assertThrows(IllegalArgumentException.class, () -> table.page(Cursor.START, 0));
         assertTrue(table.page(Cursor.START, 1).size() == 1);
